@@ -1,0 +1,251 @@
+<?xml version="1.0"?>
+<!--
+  secure-perimeter baseline for pfSense CE 2.7+ (edge-fw01)
+  Reference + restore artifact for the agreed policy (docs/policy-matrix.md).
+  Live changes are pushed through the pfSense REST API (firewall/apply-firewall.sh);
+  this file is what CI audits with firewall/policy_check.py so the perimeter
+  cannot drift quietly.
+-->
+<pfsense>
+  <version>23.09</version>
+  <system>
+    <hostname>edge-fw01</hostname>
+    <domain>corp.example.tn</domain>
+    <timezone>Etc/UTC</timezone>
+    <language>en_US</language>
+    <dns1>1.1.1.1</dns1>
+    <dns2>9.9.9.9</dns2>
+    <webgui>
+      <protocol>https</protocol>
+      <loginautocomplete/>
+      <port/>
+      <ssl-certref>5f4e2b1a8c9d0</ssl-certref>
+    </webgui>
+    <disablessh/>
+  </system>
+  <interfaces>
+    <wan>
+      <if>igb0</if>
+      <descr>WAN_UPLINK</descr>
+      <enable/>
+      <ipaddr>dhcp</ipaddr>
+    </wan>
+    <lan>
+      <if>igb1</if>
+      <descr>LAN_CORP</descr>
+      <enable/>
+      <ipaddr>10.10.10.1</ipaddr>
+      <subnet>24</subnet>
+    </lan>
+    <opt1>
+      <if>igb2</if>
+      <descr>DMZ_APPS</descr>
+      <enable/>
+      <ipaddr>10.20.20.1</ipaddr>
+      <subnet>24</subnet>
+    </opt1>
+    <opt2>
+      <if>igb3</if>
+      <descr>VPN_REMOTE</descr>
+      <enable/>
+      <ipaddr>10.99.0.1</ipaddr>
+      <subnet>22</subnet>
+    </opt2>
+  </interfaces>
+  <staticroutes/>
+  <aliases>
+    <alias>
+      <name>LAN_CORP_NET</name>
+      <type>network</type>
+      <address>10.10.10.0/24</address>
+      <descr>corporate lan segment</descr>
+    </alias>
+    <alias>
+      <name>DMZ_SERVERS</name>
+      <type>host</type>
+      <address>10.20.20.10 10.20.20.11</address>
+      <descr>published application servers</descr>
+    </alias>
+    <alias>
+      <name>VPN_CLIENTS</name>
+      <type>network</type>
+      <address>10.99.0.0/22</address>
+      <descr>telework peers (wireguard)</descr>
+    </alias>
+    <alias>
+      <name>MGMT_HOSTS</name>
+      <type>host</type>
+      <address>10.99.0.10</address>
+      <descr>firewall admin over vpn only</descr>
+    </alias>
+    <alias>
+      <name>SOC_AUTO_BLOCK</name>
+      <type>host</type>
+      <address/>
+      <descr>managed by soc-lite - do not edit by hand</descr>
+    </alias>
+  </aliases>
+  <filter>
+    <rule>
+      <type>block</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>any</protocol>
+      <source>
+        <any/>
+      </source>
+      <destination>
+        <any/>
+      </destination>
+      <descr>Default deny WAN inbound (log all)</descr>
+      <log/>
+    </rule>
+    <rule>
+      <type>pass</type>
+      <interface>lan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source>
+        <address>LAN_CORP_NET</address>
+      </source>
+      <destination>
+        <address>DMZ_SERVERS</address>
+        <port>8443</port>
+      </destination>
+      <descr>LAN to DMZ app servers 8443</descr>
+    </rule>
+    <rule>
+      <type>pass</type>
+      <interface>lan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source>
+        <address>LAN_CORP_NET</address>
+      </source>
+      <destination>
+        <any/>
+      </destination>
+      <descr>LAN default egress to internet</descr>
+    </rule>
+    <rule>
+      <type>pass</type>
+      <interface>lan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source>
+        <address>LAN_CORP_NET</address>
+      </source>
+      <destination>
+        <any/>
+        <port>443</port>
+      </destination>
+      <descr>Anti-lockout: GUI access from LAN</descr>
+    </rule>
+    <rule>
+      <type>pass</type>
+      <interface>opt2</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source>
+        <address>VPN_CLIENTS</address>
+      </source>
+      <destination>
+        <address>DMZ_SERVERS</address>
+        <port>8443</port>
+      </destination>
+      <descr>Telework: VPN clients to DMZ apps</descr>
+    </rule>
+    <rule>
+      <type>block</type>
+      <interface>opt2</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>any</protocol>
+      <source>
+        <address>VPN_CLIENTS</address>
+      </source>
+      <destination>
+        <address>LAN_CORP_NET</address>
+      </destination>
+      <descr>Telework: deny VPN to LAN (log)</descr>
+      <log/>
+    </rule>
+    <rule>
+      <type>pass</type>
+      <interface>opt2</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source>
+        <address>MGMT_HOSTS</address>
+      </source>
+      <destination>
+        <any/>
+        <port>443</port>
+      </destination>
+      <descr>Management GUI via VPN only</descr>
+    </rule>
+    <rule>
+      <type>pass</type>
+      <interface>opt1</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source>
+        <address>DMZ_SERVERS</address>
+      </source>
+      <destination>
+        <any/>
+        <port>443</port>
+      </destination>
+      <descr>DMZ updates egress 443 only</descr>
+    </rule>
+    <rule>
+      <type>block</type>
+      <interface>opt1</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>any</protocol>
+      <source>
+        <address>DMZ_SERVERS</address>
+      </source>
+      <destination>
+        <address>LAN_CORP_NET</address>
+      </destination>
+      <descr>DMZ deny to LAN (log)</descr>
+      <log/>
+    </rule>
+  </filter>
+  <nat>
+    <outbound>
+      <mode>automatic</mode>
+    </outbound>
+  </nat>
+  <installedpackages>
+    <suricata>
+      <config>
+        <enable>on</enable>
+        <iface>wan</iface>
+        <block>on</block>
+        <eve_json_log>on</eve_json_log>
+        <eve_log_dir>/var/log/suricata</eve_log_dir>
+        <categories>ET-open app-detect</categories>
+        <custom_rules>local.rules</custom_rules>
+      </config>
+    </suricata>
+  </installedpackages>
+  <wireguard>
+    <tunnel>
+      <name>VPN_REMOTE_TELEWORK</name>
+      <interface>wg0</interface>
+      <pubkey>REPLACEMESERVERPUBLICKEY=</pubkey>
+      <port>51820</port>
+      <addresses>10.99.0.1/22</addresses>
+      <peers>
+        <peer>
+          <name>admin-laptop</name>
+          <pubkey>REPLACEMEPEERPUBLICKEY=</pubkey>
+          <presharedkey>REPLACEMEPSK=</presharedkey>
+          <allowedips>10.99.0.10/32</allowedips>
+        </peer>
+      </peers>
+      <enabled>on</enabled>
+    </tunnel>
+  </wireguard>
+</pfsense>
