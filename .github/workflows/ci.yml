@@ -1,0 +1,49 @@
+---
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: lint (shellcheck + yamllint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck -x firewall/apply-firewall.sh vpn/provision-peer.sh vpn/revoke-peer.sh
+      - name: yamllint
+        run: |
+          python3 -m pip install --break-system-packages --quiet yamllint
+          yamllint -c .yamllint.yml .
+
+  test:
+    name: unit tests (soc-lite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: run pytest
+        run: |
+          python3 -m pip install --break-system-packages --quiet pytest
+          pytest -q
+
+  policy:
+    name: policy gate (baseline audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: audit the baseline against the policy matrix
+        run: python3 firewall/policy_check.py network/pfsense/config.baseline.xml --strict
+
+  demo:
+    name: soc-lite live demo (detect + would-block)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: feed a captured attack session through soc-lite
+        run: |
+          python3 ids/soc-lite/soc_lite.py --file examples/eve-sample.jsonl --dry-run | tee soc-demo.txt
+          grep -q "would block" soc-demo.txt
+          grep -q "summary: events=" soc-demo.txt
