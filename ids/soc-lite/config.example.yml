@@ -1,0 +1,19 @@
+---
+# soc-lite runtime reference - the script itself is stdlib-only and reads
+# its settings from CLI flags / env vars; this file documents the defaults
+# so operators do not have to reverse the argparse block.
+
+block_threshold: 3            # high-severity alerts before a block
+window_seconds: 120           # sliding window per source ip
+block_ttl_seconds: 900        # how long an offender stays in the alias
+alias_name: SOC_AUTO_BLOCK    # pfSense host alias owned by soc-lite
+eve_log: /var/log/suricata/eve.json
+
+allowlist:                    # never auto-blocked, whatever they do
+  - 10.0.0.0/8
+  - 172.16.0.0/12
+  - 192.168.0.0/16
+
+pf_api:                       # env vars actually consumed by the script
+  host_env: PF_HOST           # e.g. https://192.168.1.1
+  token_env: PF_TOKEN         # api token from System > User Manager > API
