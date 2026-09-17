@@ -1,0 +1,20 @@
+# local state - peer profiles and allocations never leave the admin box
+vpn/peers/
+*.conf.bak
+*.revoked
+
+# runtime artifacts
+soc-demo.txt
+eve.json
+*.log
+
+# python
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# editors / os
+.DS_Store
+*.swp
+.idea/
+.vscode/
