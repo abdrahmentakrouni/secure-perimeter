@@ -1,0 +1,7 @@
+# soc-lite / suricata tuning - one sid per line
+# format: <sid>  # reason
+#
+# keep this list short and justified; every entry is audit surface.
+
+2027865  # ET INFO repeated TLS ping from monitoring host (10.10.10.8 uptime probe)
+1000005  # dns tunnel heuristic - false positives on large DNS responses (app-01 updates)
